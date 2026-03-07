@@ -17,7 +17,7 @@ export default async function HomePage() {
     .eq('deleted', false)
     .order('created_at', { ascending: false })
     .limit(8)
-
+    
   return (
     <main>
       <HeroSection />
