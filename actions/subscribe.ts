@@ -1,15 +1,30 @@
 'use server'
-import { verifyBot } from './verifyBot'
+import arcjet, { detectBot } from '@arcjet/next'
+import { headers } from 'next/headers'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+
+const aj = arcjet({
+  key: process.env.ARCJET_KEY!,
+  rules: [
+    detectBot({
+      mode: 'LIVE',
+      allow: [],
+    }),
+  ],
+})
 
 const emailSchema = z.string().email('Please enter a valid email address')
 
 export async function subscribeEmail(formData: FormData) {
-  const botCheck = await verifyBot();
-  if (!botCheck.success) {
-    return { error: botCheck.error || 'Suspicious activity detected' };
+  const headersList = await headers()
+  const req = new NextRequest('http://localhost', { headers: headersList })
+  const decision = await aj.protect(req)
+  if (decision.isDenied()) {
+    return { error: 'Suspicious activity detected' }
   }
+
   const email = formData.get('email') as string
 
   // Validate email

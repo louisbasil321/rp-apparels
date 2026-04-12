@@ -1,20 +1,39 @@
 // actions/basket.ts
 'use server'
-import { checkBotId } from 'botid/server';
+import arcjet, { detectBot } from '@arcjet/next'
+import { headers } from 'next/headers'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
-import { BasketInsert } from '@/lib/types'
+
+const aj = arcjet({
+  key: process.env.ARCJET_KEY!,
+  rules: [
+    detectBot({
+      mode: 'LIVE',
+      allow: [],
+    }),
+  ],
+})
+
+async function checkBot() {
+  const headersList = await headers()
+  const req = new NextRequest('http://localhost', { headers: headersList })
+  return aj.protect(req)
+}
 
 // ------------------------------------------------------------------
 // Create a new basket or add item to existing basket
 // ------------------------------------------------------------------
 export async function createBasket(productId: string, quantity: number) {
-  const cookieStore = await cookies()
-   const verification = await checkBotId();
-  if (verification.isBot) {
-    throw new Error('Suspicious activity detected');
+  const decision = await checkBot()
+  if (decision.isDenied()) {
+    throw new Error('Suspicious activity detected')
   }
+
+  const cookieStore = await cookies()
+
   // Ensure guest session exists BEFORE createClient reads it into the header
   let guestSessionId = cookieStore.get('guest_session_id')?.value
   if (!guestSessionId) {
@@ -119,6 +138,7 @@ export async function createBasket(productId: string, quantity: number) {
   revalidatePath(`/basket/${basketId}`)
   return { basketId }
 }
+
 // ------------------------------------------------------------------
 // Update (or delete) an item in a basket
 // ------------------------------------------------------------------
@@ -126,14 +146,12 @@ export async function updateBasketItem(basketId: string, productId: string, quan
   const supabase = await createClient()
 
   if (quantity <= 0) {
-    // Remove item
     await supabase
       .from('basket_items')
       .delete()
       .eq('basket_id', basketId)
       .eq('product_id', productId)
   } else {
-    // Check availability
     const { data: product, error: prodError } = await supabase
       .from('products')
       .select('available, price')
@@ -170,11 +188,12 @@ export async function updateBasketDetails(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const verification = await checkBotId();
-    if (verification.isBot) {
-      return { success: false, error: 'Suspicious activity detected' };
+    const decision = await checkBot()
+    if (decision.isDenied()) {
+      return { success: false, error: 'Suspicious activity detected' }
     }
-    const supabase = await createClient();
+
+    const supabase = await createClient()
     const { error } = await supabase
       .from('baskets')
       .update({
@@ -182,16 +201,16 @@ export async function updateBasketDetails(
         phone: details.phone,
         state: details.state,
       })
-      .eq('id', basketId);
+      .eq('id', basketId)
 
     if (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: error.message }
     }
-    revalidatePath(`/basket/${basketId}`);
-    return { success: true };
+    revalidatePath(`/basket/${basketId}`)
+    return { success: true }
   } catch (err: any) {
-    console.error('updateBasketDetails error:', err);
-    return { success: false, error: err.message || 'Failed to save customer details' };
+    console.error('updateBasketDetails error:', err)
+    return { success: false, error: err.message || 'Failed to save customer details' }
   }
 }
 
@@ -282,7 +301,6 @@ export async function getUserOrders() {
   if (user) {
     query = query.eq('customer_id', user.id)
   } else if (guestSessionId) {
-    // For guests, find orders via original_basket_id -> baskets
     const { data: guestBaskets } = await supabase
       .from('baskets')
       .select('id')
@@ -302,9 +320,6 @@ export async function getUserOrders() {
 // ------------------------------------------------------------------
 // Link guest baskets to a newly registered user (call after signup)
 // ------------------------------------------------------------------
-// actions/basket.ts
-// actions/basket.ts
-// actions/basket.ts
 export async function consolidateUserBaskets() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -314,7 +329,7 @@ export async function consolidateUserBaskets() {
     p_user_id: user.id,
   })
   if (error) throw error
-  return data as string // target basket ID
+  return data as string
 }
 
 export async function mergeGuestBasket(consent: boolean) {
@@ -342,7 +357,6 @@ export async function mergeGuestBasket(consent: boolean) {
       })
       if (error) throw error
     }
-    // Clear guest cookie regardless
     cookieStore.set('guest_session_id', '', { maxAge: 0, path: '/' })
   }
 
@@ -356,7 +370,6 @@ export async function mergeGuestBasket(consent: boolean) {
   }
 
   // 3. Cleanup: delete any empty baskets for this user (except target)
-  // First, get all other pending/invalid baskets
   const { data: otherBaskets, error: fetchError } = await supabase
     .from('baskets')
     .select('id')
@@ -368,7 +381,6 @@ export async function mergeGuestBasket(consent: boolean) {
 
   if (otherBaskets && otherBaskets.length > 0) {
     for (const basket of otherBaskets) {
-      // Call the security definer function to delete if empty
       await supabase.rpc('delete_basket_if_empty', { p_basket_id: basket.id })
     }
   }
@@ -382,12 +394,10 @@ export async function mergeGuestBasket(consent: boolean) {
   if (countError) throw countError
 
   if (count === 0) {
-    // Target basket is empty – delete it
     await supabase.rpc('delete_basket_if_empty', { p_basket_id: targetBasketId })
     targetBasketId = null
     cookieStore.delete('basketId')
   } else {
-    // Update cookie to point to the remaining basket
     cookieStore.set('basketId', targetBasketId, { maxAge: 60 * 60 * 24 * 30, path: '/' })
   }
 
