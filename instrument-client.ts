@@ -1,10 +1,6 @@
-// instrumentation-client.ts
-import { initBotId } from 'botid/client/core';
-
-initBotId({
-  protect: [
-    { path: '/', method: 'POST' },       // Protects Server Actions on the home page
-    { path: '/*', method: 'POST' },      // Protects first-level routes (e.g., /checkout)
-    { path: '/**', method: 'POST' },     // Protects deeply nested routes (e.g., /products/123)
-  ],
-});
+// instrumentation-client.ts or layout.tsx
+const protectedRoutes = [
+  { path: '/', method: 'POST' },        // CRITICAL: Covers actions on home page
+  { path: '/:path*', method: 'POST' }, 
+  {path: '/shop', method: 'POST'} // Covers all other routes
+];
