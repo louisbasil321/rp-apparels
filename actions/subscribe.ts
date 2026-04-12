@@ -1,14 +1,14 @@
 'use server'
-import { checkBotId } from 'botid/server';
+import { verifyBot } from './verifyBot'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const emailSchema = z.string().email('Please enter a valid email address')
 
 export async function subscribeEmail(formData: FormData) {
-   const verification = await checkBotId();
-  if (verification.isBot) {
-    throw new Error('Suspicious activity detected');
+  const botCheck = await verifyBot();
+  if (!botCheck.success) {
+    return { error: botCheck.error || 'Suspicious activity detected' };
   }
   const email = formData.get('email') as string
 

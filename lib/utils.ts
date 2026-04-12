@@ -35,5 +35,5 @@ export const isProductNew = (createdAt: string): boolean => {
 
 export const getBaseUrl = () => {
   // For debugging – replace with your actual Vercel URL
-  return 'https://rp-apparels.vercel.app';
+  return 'https://dare-fahions.vercel.app';
 };

@@ -8,16 +8,9 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 const protectedRoutes = [
-  // Add the pages that call your protected server actions
-  // For basket actions (createBasket, updateBasketItem, etc.), this is usually the shop page
-  { path: '/shop', method: 'POST' },
-  // If you have a dedicated product page, add it too
-  { path: '/product/*', method: 'POST' }, // wildcard for dynamic product routes
-  // Add any other pages that trigger server actions
-  { path: '/baskets', method: 'POST' },
-  { path: '/login', method: 'POST' },
-  { path: '/', method: 'POST' },
+  { path: '/*', method: 'POST' }, // covers every page in the app
 ];
+
 export const metadata: Metadata = {
   title: 'RP Apparels',
   description: 'Premium fashion for the modern individual',
